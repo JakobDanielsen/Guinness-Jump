@@ -62,7 +62,15 @@ function _update60()
 	bgsnwmake()
 	bgcloudmake()
 	fgcloudmake()
-		if not cant_move then timer +=1 end
+	 timer += 1 -- dette holder vれすret i gang
+		if not cant_move then 
+    
+    speedrun_frames += 1
+    if speedrun_frames >= 60 then
+        speedrun_seconds += 1
+        speedrun_frames = 0
+    end
+		end
 		slingshot_update()
 		move_player(player)
 		if weird_mode then
@@ -83,7 +91,7 @@ function _update60()
 	 if btn(⬅️) then player.vx =-2 end
 		if btn(➡️) then player.vx =2 end
 	 if btn(⬇️) then player.vx =0 end
-		if speedrun_mode and btn(🅾️) and btn(❎) then
+		if (speedrun_mode or cant_move) and (btn(🅾️) and btn(❎)) then
 			if weird_mode then
 				respawn(450)
 			else
@@ -210,22 +218,46 @@ function draw_particles()
 	end
 end
 
+function print_wave(txt, x, y, col)
+    local speed = 1       -- hvor raskt bれまlgen ruller
+    local amplitude = 1.9     -- hvor mange piksler den spretter opp og ned
+    local wave_length = 0.05 -- hvor stor forskyvning det er mellom hver bokstav
+    
+    for i = 1, #txt do
+        local char = sub(txt, i, i)
+        
+        -- standard pico-8-font er 4 piksler bred per bokstav
+        local char_x = x + (i - 1) * 4 
+        
+        -- regner ut y-posisjonen basert pれし tid og bokstavens plassering i ordet
+        local char_y = y + sin(t() * speed - i * wave_length) * amplitude
+        
+        print(char, char_x, char_y, col)
+    end
+end
+
 victory_music_played = false
 function draw_victory_screen()
 	if not victory_music_played then 
-		music(0) 
+		music(10) 
 		victory_music_played = true
 	end
 	local r = {
 	x1=cam.x+10,
-	y1=cam.y+30,
+	y1=cam.y+20,
 	x2=cam.x+128-10,
-	y2=cam.y+128-30}
+	y2=cam.y+128-40}
 	rectfill(r.x1,r.y1,r.x2,r.y2,1)
 	rect(r.x1+1,r.y1+1,r.x2-1,r.y2-1,7)
 	--print ("time: "..format_time(timer),cam.x+10+10-1,cam.y+31+50+1,13)
-	print ("time: "..format_time(timer),cam.x+30,cam.y+31+50,7)
-	print ("weird mode was added to pause menu",r.x1+3,r.y2-7,2)
+	print("jumps: "..jump_counter,cam.x+30,cam.y+40,7)
+
+	print ("time: "..format_time(speedrun_seconds),cam.x+30,cam.y+31+40,7)
+	print ("press z + x to restart",r.x1+3,r.y2-7,5)
+	if not wm_unlock_seen and (_game_over_delay_counter> _game_over_delay+180)  then
+		print_wave("weird mode added to pause menu",r.x1-5,r.y2+20-7,2)
+		print_wave("weird mode added to pause menu",r.x1-5-1,r.y2+20-7-1,7)
+	end
 
 end
 
@@ -261,7 +293,7 @@ function draw_coin_meter()
 end
 
 function draw_speedrun_clock()
-	if speedrun_mode then print(format_time(timer),cam.x+96,cam.y+1,7) end
+    if speedrun_mode then print(format_time(speedrun_seconds),cam.x+96,cam.y+1,7) end
 end
 -->8
 --enitty info
@@ -269,7 +301,10 @@ function entityinit()
 	gravity = 0.18
 	terminal_velocity = 6
 	jump_counter = 0
-	timer = 0
+	
+	timer = 0 -- beholdes for snれま og skyer
+	speedrun_frames = 0
+	speedrun_seconds = 0
 	
 	weird_mode = false
 	
@@ -323,8 +358,8 @@ function entityinit()
 		},{x=63*8,y=18*8,taken=false,w=8,h=8
 		},{x=93*8,y=62*8,taken=false,w=8,h=8
 		},{x=63*8,y=35*8,taken=false,w=8,h=8
-		},{x=91*8,y=21*8,taken=false,w=8,h=8
-		},{x=88*8,y=45*8,taken=false,w=8,h=8
+		},{x=91*8,y=1*8,taken=false,w=8,h=8
+		},{x=119*8,y=59*8,taken=false,w=8,h=8
 		}
 	}
 	
@@ -569,7 +604,10 @@ function updatevariables()
 		-- kameraet stopper ved map-kantene (1024 bredt, 512 hれまyt)
 		cam.x = mid(0, px - 64 + 4, 1024 - 128)
 		cam.y = mid(0, py - 64, 512 - 128)
-		if py>730 then respawn(450) end
+		if py>730 then
+			 respawn(450)
+			 sfx(38)
+		 end
 	else
 		cam.x = mid(0, px - 64 + 4, 128)
 		cam.y = mid(-1992, py - 64, 128)
@@ -699,6 +737,9 @@ function respawn(y)
 	victory_music_played = false
 	_game_over_delay_counter = 0
  timer=0
+ speedrun_seconds = 0
+ speedrun_frames = 0
+ jump_counter = 0
  cant_move = false
 	sfx(-1)
 	music(-1)
@@ -718,7 +759,6 @@ function rnd_ambientsound()
 	local px = player.x
 	local py = player.y
 	if lockout<0 then 
-		-- obs! sjekk disse sonene. kartet gれしr ikke lengre enn x=256 nれし.
 		if px>140 and py<168 then 
 			if rnd()>0.999 then 
 				local rnd_sound = rnd()
@@ -752,6 +792,9 @@ function check_win(win_type)
 			--game_over = true
 			cant_move = true
 			weird_mode_unlocked=true
+			if dget(0)==1 then -- bare se unlock frste gang
+				wm_unlock_seen = true 
+			end
 			dset(0, 1)
 			if _game_over_delay_counter >= _game_over_delay then draw_victory_screen() end
 		end
@@ -771,15 +814,6 @@ function updatemouse()
 	mouse.y=stat(33)+cam.y
 	if stat(34)==1 then mouse.mouse_down = true 
 	else mouse.mouse_down = false end 
-end
-
-function format_time(ticks)
-  local total_s = flr(ticks / 60)
-  local h = flr(total_s / 3600)
-  local m = flr((total_s % 3600) / 60)
-  local s = total_s % 60
-  local function pad(n) return (n < 10 and "0"..n or ""..n) end
-  return pad(h)..":"..pad(m)..":"..pad(s)
 end
 
 function zone_control()
@@ -845,16 +879,12 @@ function update_red_coins()
 	end
 end
 
-function format_time(ticks)
-  local total_s = flr(ticks / 60)
+function format_time(total_s)
   local h = flr(total_s / 3600)
   local m = flr((total_s % 3600) / 60)
   local s = total_s % 60
-
-  local function pad(n)
-    return (n < 10 and "0"..n or ""..n)
-  end
-
+  
+  local function pad(n) return (n < 10 and "0"..n or ""..n) end
   return pad(h)..":"..pad(m)..":"..pad(s)
 end
 
@@ -963,15 +993,15 @@ end
 
 fgclouds = {typ="fg"}
 bgclouds = {typ="bg"}
-cloudfrequency = 60
+cloudfrequency = 40
 
 
 function bgcloudmake()
-	if timer % cloudfrequency == 30 then
+	if timer % cloudfrequency == 0 then
 		if rnd(1)>0.7 then return end
 		add(bgclouds,{
 		x=-16,
-		y=rnd(1500)-2100,
+		y=rnd(1400)-1900,
 		vx=rnd(0.25)+0.01,
 		sp=flr(rnd(3))+1}) // 1,2 or 3 - wow i didnt know // worked
 	end
@@ -984,7 +1014,7 @@ function bgcloudmake()
 end
 
 function fgcloudmake()
-	if timer % cloudfrequency == 0 then
+	if timer % cloudfrequency == 2 then
 		if rnd(1)>0.4 then return end
 		add(fgclouds,{
 		x=-24,
@@ -1351,14 +1381,15 @@ a7030000186051860518605186051860518605186051860518605186051860518605186051860518
 0110000000000230002105521055210550000021055000001d0550000018055000001a05500000000001d0551d055000000000000000000000000000000000000000000000000000000000000000001805518055
 0110000018055000001d055000001d05500000240550000021055000001d0001d0000000000000000000000000000000000000000000000000000000000180001800000000000000000000000000000000000000
 011000000f0500f0500f0500f0500f0500f0500f0500f050110501105011050110501105011050110501105011050110501105011050000000000000000000000000000000000000000000000000000000000000
-010f00002005024050200501d05020050000002005024050200501d05020050220502405022050200501d0502105024050210501d05021050000002105024050210501d05021050220502405022050210501d050
-010f00002005024050200501d05020050000002005024050200501d05020050220502405022050200501d0502005024050200501c05020050000002005024050200501c05020050220502405022050200501c050
-010f00002205025050220501e05022050000002205025050220501e05022050240502505024050220501e0502205025050220501e05022050000002205025050220501e05022050240502505024050220501e050
-000f00002205026050220501f05022050000002205026050220501f05022050240502605024050220501f0502205026050220501f05022050000002205026050220501f05022050240502605024050220501f050
-000f000018050180001b0001c000180001800018050180001b0001c000180001800018050180001b0001c0001a05018000180001800018000180001a05018000180001800018000180001a050180001800000000
-000f000019050180001b0001c000180001800019050180001b0001c000180001800019050180001b0001c000180500c0000f000100001800018000180500c0000f000100000c0000c00018050180001b0001c000
-010f00001b050180001b0001c00018000180001b050180001b0001c00018000180001b050180001b00018000000001b0001b05018000180001b000180001b0001b05018000180001b0001b0501b0001c00000000
-010f00001f050180001b0001c00018000180001f050180001b0001c00018000180001f050180001b00018000000001b0001f05018000180001b000180001b0001f05018000180001b0001f0501b0001c00000000
+070f000014055180551405511055140550c0051405518055140551105514055160551805516055140551105515055180551505511055150550c00515055180551505511055150551605518055160551505511055
+070f000014055180551405511055140550c0051405518055140551105514055160551805516055140551105514055180551405510055140550c00514055180551405510055140551605518055160551405510055
+070f000016055190551605512055160550c0051605519055160551205516055180551905518055160551205516055190551605512055160550c00516055190551605512055160551805519055180551605512055
+070f0000160551a0551605513055160550c005160551a055160551305516055180551a055180551605513055160551a0551605513055160550c005160551a055160551305516055180551a055180551605513055
+010f00000c0520c0550c0000c0000c0040c0040c0520c0550c0000c0000c0040c0040c0520c0520c0520c0550e0520e0550e0000e0000c0040c0040e0520e0550e0000e0000c0040c0040e0520e0520e0520e055
+010f00000f0520f0550f000100000c0000c0000f0520f0550f000100000c0000c0000f0520f0520f0520f0550d0520d0550f000100000c0000c0000d0520d0550f000100000c0000c0000d0520d0520d0520d055
+010f00000f0520f0550f000100000c0000c0000f0520f0550f000100000c0000c0000f0520f0550f0000c0000c0000f0000f0520f0550c0000f0000c0000f0000f0520f0550c0000f0000f0520f0551000000000
+010f000013052130550f000100000c0000c00013052130550f000100000c0000c00013052130550f0000c0000c0000f00013052130550c0000f0000c0000f00013052130550c0000f00013052130550000000000
+070b000018053180431803318023180131800318003180031800318003180000c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __music__
 01 14155744
 00 16184344
